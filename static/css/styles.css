@@ -117,6 +117,25 @@ input[type="password"]:focus {
     display: inline-block;
 }
 
+select {
+    width: 280px; /* mismo ancho */
+    max-width: 100%;
+    padding: 10px 12px;
+    margin: 0 auto 12px auto;
+    display: block;
+    border: 1.5px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+select:focus {
+    border-color: #2e7d32;
+    outline: none;
+}
+
+
+
 /* Botón Registrar */
 .btn-iniciar {
     background-color: #388e3c;

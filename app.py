@@ -16,12 +16,12 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Tabla usuarios
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
             nombre_usuario TEXT UNIQUE NOT NULL,
+            curso TEXT NOT NULL,
             documento TEXT UNIQUE NOT NULL,
             correo TEXT UNIQUE NOT NULL,
             contrasena TEXT NOT NULL,
@@ -31,7 +31,6 @@ def init_db():
         );
     ''')
 
-    # Tabla proyectos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS proyectos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +44,6 @@ def init_db():
         );
     ''')
 
-    # Tabla tareas
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tareas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +60,6 @@ def init_db():
         );
     ''')
 
-    # Tabla notificaciones
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS notificaciones (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,10 +87,11 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 class Usuario(UserMixin):
-    def __init__(self, id, nombre, nombre_usuario, documento, correo, contrasena, rol, fecha_registro, activo):
+    def __init__(self, id, nombre, nombre_usuario, curso, documento, correo, contrasena, rol, fecha_registro, activo):
         self.id = id
         self.nombre = nombre
         self.nombre_usuario = nombre_usuario
+        self.curso = curso
         self.documento = documento
         self.correo = correo
         self.contrasena = contrasena
@@ -106,7 +104,20 @@ def load_user(user_id):
     conn = get_db_connection()
     fila = conn.execute('SELECT * FROM usuarios WHERE id = ?', (user_id,)).fetchone()
     conn.close()
-    return Usuario(*fila) if fila else None
+    if fila:
+        return Usuario(
+            id=fila['id'],
+            nombre=fila['nombre'],
+            nombre_usuario=fila['nombre_usuario'],
+            curso=fila['curso'],
+            documento=fila['documento'],
+            correo=fila['correo'],
+            contrasena=fila['contrasena'],
+            rol=fila['rol'],
+            fecha_registro=fila['fecha_registro'],
+            activo=fila['activo']
+        )
+    return None
 
 @app.route('/')
 def index():
@@ -121,7 +132,18 @@ def login():
         fila = conn.execute('SELECT * FROM usuarios WHERE nombre_usuario = ?', (usuario,)).fetchone()
         conn.close()
         if fila and check_password_hash(fila['contrasena'], contrasena) and fila['activo']:
-            user = Usuario(*fila)
+            user = Usuario(
+                id=fila['id'],
+                nombre=fila['nombre'],
+                nombre_usuario=fila['nombre_usuario'],
+                curso=fila['curso'],
+                documento=fila['documento'],
+                correo=fila['correo'],
+                contrasena=fila['contrasena'],
+                rol=fila['rol'],
+                fecha_registro=fila['fecha_registro'],
+                activo=fila['activo']
+            )
             login_user(user)
             return redirect(url_for('admin' if user.rol == 'rol_administrador' else 'persona'))
         flash('Usuario o contraseña incorrectos')
@@ -130,18 +152,19 @@ def login():
 @app.route('/crear_usuario', methods=['GET', 'POST'])
 def crear_usuario():
     if request.method == 'POST':
-        nombre         = request.form['nombre']
+        nombre = request.form['nombre']
         nombre_usuario = request.form['nombre_usuario']
-        documento      = request.form['documento']
-        correo         = request.form['correo']
-        contrasena     = generate_password_hash(request.form['contrasena'])
-        rol            = request.form.get('rol', 'rol_usuario')
+        curso = request.form['curso']
+        documento = request.form['documento']
+        correo = request.form['correo']
+        contrasena = generate_password_hash(request.form['contrasena'])
+        rol = request.form.get('rol', 'rol_usuario')
         conn = get_db_connection()
         try:
             conn.execute('''
-                INSERT INTO usuarios (nombre, nombre_usuario, documento, correo, contrasena, rol)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (nombre, nombre_usuario, documento, correo, contrasena, rol))
+                INSERT INTO usuarios (nombre, nombre_usuario, curso, documento, correo, contrasena, rol)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (nombre, nombre_usuario, curso, documento, correo, contrasena, rol))
             conn.commit()
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
@@ -167,7 +190,6 @@ def persona():
     usuarios = conn.execute('SELECT * FROM usuarios WHERE activo = 1').fetchall()
     conn.close()
     return render_template('persona.html', usuarios=usuarios)
-
 
 @app.route('/logout')
 @login_required
