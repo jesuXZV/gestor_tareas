@@ -78,6 +78,21 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_tareas_id_usuario_asignado ON tareas(id_usuario_asignado);')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_proyectos_id_usuario_creador ON proyectos(id_usuario_creador);')
 
+    try:
+        cursor.execute("ALTER TABLE usuarios ADD COLUMN tema TEXT DEFAULT 'claro';")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE usuarios ADD COLUMN idioma TEXT DEFAULT 'es';")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE usuarios ADD COLUMN notificaciones INTEGER DEFAULT 1;")
+    except sqlite3.OperationalError:
+        pass
+
     conn.commit()
     conn.close()
 
@@ -161,17 +176,21 @@ def crear_usuario():
         rol = request.form.get('rol', 'rol_usuario')
         conn = get_db_connection()
         try:
+            # Ejecutar inserción
             conn.execute('''
                 INSERT INTO usuarios (nombre, nombre_usuario, curso, documento, correo, contrasena, rol)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (nombre, nombre_usuario, curso, documento, correo, contrasena, rol))
+
             conn.commit()
             return redirect(url_for('login'))
+
         except sqlite3.IntegrityError:
             flash('El nombre de usuario, documento o correo ya existe')
         finally:
             conn.close()
     return render_template('crear_usuario.html')
+
 
 @app.route('/admin')
 @login_required
@@ -196,6 +215,51 @@ def persona():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+@app.route('/ajustes', methods=['POST'])
+@login_required
+def ajustes():
+    tema = request.form.get('tema')
+    idioma = request.form.get('idioma')
+    notificaciones = 1 if request.form.get('notificaciones') == 'on' else 0
+
+    try:
+        conn = get_db_connection()
+        conn.execute('''
+            UPDATE usuarios
+            SET tema = ?, idioma = ?, notificaciones = ?
+            WHERE id = ?
+        ''', (tema, idioma, notificaciones, current_user.id))
+        conn.commit()
+        conn.close()
+        return 'OK'
+    except Exception as e:
+        print("Error al guardar ajustes:", e)
+        return 'Error al guardar ajustes', 500
+    
+
+@app.route('/ajustes', methods=['POST'])
+@login_required
+def guardar_ajustes():
+    tema = request.form.get('tema')
+    idioma = request.form.get('idioma')
+    notificaciones = request.form.get('notificaciones')
+
+    try:
+        conn = get_db_connection()
+        conn.execute(
+            'UPDATE usuarios SET tema = ?, idioma = ?, notificaciones = ? WHERE id = ?',
+            (tema, idioma, int(notificaciones == "on"), current_user.id)
+        )
+        conn.commit()
+        conn.close()
+        return "Ajustes guardados correctamente", 200
+    except Exception as e:
+        print("Error al guardar ajustes:", e)
+        return "Error al guardar ajustes", 500
+
+
+
 
 if __name__ == '__main__':
     init_db()
